@@ -1,0 +1,110 @@
+{% extends 'base.html' %}
+{% load crispy_forms_tags %}
+
+{% block content %}
+<div class="grid-2">
+    <!-- Left Column: Post Question Form -->
+    <div class="glass-panel">
+        <h2><span style="font-size: 1.5rem; margin-right: 0.5rem;">➕</span> Post New Challenge</h2>
+        <p style="color: var(--text-muted); margin-bottom: 2rem;">Create a new Data Structures or Algorithms question
+            for coders to solve.</p>
+
+        <form method="post">
+            {% csrf_token %}
+            <div class="form-group">
+                <label for="title">Challenge Title</label>
+                <input type="text" name="title" id="title" class="form-control" placeholder="e.g., Two Sum" required>
+            </div>
+
+            <div class="form-group">
+                <label for="description">Detailed Description</label>
+                <textarea name="description" id="description" class="form-control" rows="8"
+                    placeholder="Describe the problem, input formats, output formats, and constraints..." required
+                    style="resize: vertical; font-family: inherit; font-size: 0.95rem;"></textarea>
+            </div>
+
+            <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 1rem;">Publish
+                Challenge</button>
+        </form>
+    </div>
+
+    <!-- Right Column: List of Posted Questions -->
+    <div class="glass-panel" style="display: flex; flex-direction: column;">
+        <h2><span style="font-size: 1.5rem; margin-right: 0.5rem;">📋</span> Your Posted Challenges</h2>
+        <p style="color: var(--text-muted); margin-bottom: 2rem;">Questions you have created on the platform.</p>
+
+        <div style="flex: 1; overflow-y: auto; padding-right: 0.5rem;">
+            {% if questions %}
+            <div style="display: grid; gap: 1rem;">
+                {% for q in questions %}
+                <div class="card" style="padding: 1.25rem;">
+                    <div style="display: flex; justify-content: space-between; align-items:flex-start;">
+                        <h3 style="margin-bottom: 0.5rem; font-size: 1.25rem;">{{ q.title }}</h3>
+                        <span
+                            style="font-size: 0.8rem; color: var(--text-muted); background: rgba(255,255,255,0.05); padding: 0.25rem 0.6rem; border-radius: 4px;">ID:
+                            {{ q.id }}</span>
+                    </div>
+                    <p style="color: var(--text-muted); font-size: 0.9rem; line-height: 1.5; margin-bottom: 1rem;">
+                        {{ q.description|truncatewords:20 }}
+                    </p>
+                    <div style="font-size: 0.8rem; color: var(--text-muted); display: flex; justify-content: space-between; align-items: center;">
+                        <span>📅 Posted: {{ q.created_at|date:"M d, Y H:i" }}</span>
+                        {% if not q.is_closed %}
+                        <a href="{% url 'close_question' q.id %}" class="btn btn-outline" 
+                           style="padding: 0.25rem 0.5rem; font-size: 0.75rem; border-color: var(--danger); color: var(--danger); text-decoration: none;"
+                           onclick="return confirm('Are you sure you want to close this challenge? Rewards will be distributed to coders on the leaderboard.')">Close Challenge</a>
+                        {% else %}
+                        <span style="color: var(--danger); font-weight: bold;">🔒 CLOSED</span>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="flex-center" style="height: 100%; min-height: 200px; flex-direction: column; opacity: 0.5;">
+                <div style="font-size: 3rem; margin-bottom: 1rem;">📭</div>
+                <p>No challenges posted yet.</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- Bottom Section: Coder Approval Requests -->
+<div class="glass-panel" style="margin-top: 2rem;">
+    <h2><span style="font-size: 1.5rem; margin-right: 0.5rem;">👤</span> Pending Coder Approvals</h2>
+    <p style="color: var(--text-muted); margin-bottom: 1.5rem;">New coder registrations awaiting your permission to login.</p>
+
+    {% if unapproved_coders %}
+    <div style="overflow-x: auto;">
+        <table style="width: 100%; border-collapse: collapse; margin-top: 1rem;">
+            <thead>
+                <tr style="text-align: left; border-bottom: 1px solid rgba(255,255,255,0.1); color: var(--text-muted); font-size: 0.85rem;">
+                    <th style="padding: 1rem;">Coder Roll No</th>
+                    <th style="padding: 1rem;">Email Address</th>
+                    <th style="padding: 1rem;">Current Coins</th>
+                    <th style="padding: 1rem; text-align: right;">Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for coder in unapproved_coders %}
+                <tr style="border-bottom: 1px solid rgba(255,255,255,0.05); font-size: 0.95rem;">
+                    <td style="padding: 1rem; font-weight: bold; color: var(--primary);">{{ coder.rollno }}</td>
+                    <td style="padding: 1rem;">{{ coder.email }}</td>
+                    <td style="padding: 1rem;">{{ coder.coins }}</td>
+                    <td style="padding: 1rem; text-align: right;">
+                        <a href="{% url 'approve_coder' coder.id %}" class="btn btn-primary" 
+                           style="padding: 0.4rem 1rem; font-size: 0.85rem; background: var(--success); text-decoration: none;">Approve Coder</a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="flex-center" style="padding: 3rem; flex-direction: column; opacity: 0.4; border: 1px dashed rgba(255,255,255,0.1); border-radius: 8px;">
+        <p>No pending approval requests at the moment.</p>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

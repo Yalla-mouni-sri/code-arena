@@ -1,0 +1,41 @@
+{% extends 'base.html' %}
+{% load crispy_forms_tags %}
+
+{% block content %}
+<div class="flex-center" style="min-height: 70vh; padding: 2rem 0;">
+    <div class="glass-panel" style="max-width: 600px; width: 100%;">
+        <div style="text-align: center; margin-bottom: 2rem;">
+            <h2>Register as an Admin</h2>
+            <p style="color: var(--text-muted);">Create an admin account to post challenges.</p>
+        </div>
+
+        <form method="post" style="display: grid; gap: 1rem;">
+            {% csrf_token %}
+            {{ form|crispy }}
+            <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 1.5rem;">Register as Admin</button>
+        </form>
+
+        <div style="text-align: center; margin-top: 1.5rem; font-size: 0.9rem;">
+            Already have an account? <a href="{% url 'admin_login' %}" style="color: var(--primary);">Login</a>
+        </div>
+    </div>
+</div>
+
+<style>
+    .form-group label {
+        margin-bottom: 0.5rem;
+        color: var(--text-muted);
+        font-size: 0.9rem;
+    }
+    input[type="text"],
+    input[type="email"],
+    input[type="password"] {
+        width: 100%;
+        padding: 0.75rem 1rem;
+        background: rgba(15, 23, 42, 0.6);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        color: white;
+    }
+</style>
+{% endblock %}

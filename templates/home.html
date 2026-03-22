@@ -1,0 +1,29 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="flex-center" style="min-height: 70vh; flex-direction: column; text-align: center;">
+    <h1 style="font-size: 4rem; margin-bottom: 1.5rem;">Welcome to CodeArena</h1>
+    <p style="font-size: 1.25rem; color: var(--text-muted); max-width: 600px; margin-bottom: 3rem;">
+        The premier platform where Data Structures and Algorithms meet their match. Are you an Admin posting challenges or a Coder solving them?
+    </p>
+
+    <div class="grid-2" style="max-width: 800px; width: 100%;">
+        <div class="glass-panel" style="display: flex; flex-direction: column; align-items: center;">
+            <div style="font-size: 3rem; margin-bottom: 1rem;">👨‍💻</div>
+            <h2>For Coders</h2>
+            <p style="color: var(--text-muted); margin-bottom: 2rem;">Solve complex data structure questions and sharpen your skills.</p>
+            <a href="{% url 'coder_login' %}" class="btn btn-primary" style="width: 100%;">Coder Login</a>
+            <div style="margin-top: 1rem; font-size: 0.9rem;">
+                New here? <a href="{% url 'coder_register' %}" style="color: var(--primary);">Register Now</a>
+            </div>
+        </div>
+
+        <div class="glass-panel" style="display: flex; flex-direction: column; align-items: center;">
+            <div style="font-size: 3rem; margin-bottom: 1rem;">🛡️</div>
+            <h2>For Admins</h2>
+            <p style="color: var(--text-muted); margin-bottom: 2rem;">Post technical challenges, assess solutions, and manage the arena.</p>
+            <a href="{% url 'admin_login' %}" class="btn btn-outline" style="width: 100%;">Admin Login</a>
+        </div>
+    </div>
+</div>
+{% endblock %}

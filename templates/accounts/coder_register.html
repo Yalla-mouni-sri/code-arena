@@ -1,0 +1,70 @@
+{% extends 'base.html' %}
+{% load crispy_forms_tags %}
+
+{% block content %}
+<div class="flex-center" style="min-height: 70vh; padding: 2rem 0;">
+    <div class="glass-panel" style="max-width: 600px; width: 100%;">
+        <div style="text-align: center; margin-bottom: 2rem;">
+            <h2>Register as a Coder</h2>
+            <p style="color: var(--text-muted);">Join CodeArena to start solving.</p>
+        </div>
+
+        <form method="post" style="display: grid; gap: 1rem;">
+            {% csrf_token %}
+            {{ form|crispy }}
+            <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 1.5rem;">Join as
+                Coder</button>
+        </form>
+
+        <div style="text-align: center; margin-top: 1.5rem; font-size: 0.9rem;">
+            Already have an account? <a href="{% url 'coder_login' %}" style="color: var(--primary);">Login</a>
+        </div>
+    </div>
+</div>
+
+<style>
+    /* Override Crispy Forms text colors for dark theme */
+    .form-group label {
+        margin-bottom: 0.5rem;
+        color: var(--text-muted);
+        font-size: 0.9rem;
+    }
+
+    .help-block {
+        color: #64748b;
+        font-size: 0.8rem;
+        margin-top: 0.25rem;
+    }
+
+    .text-danger {
+        color: var(--danger);
+    }
+
+    input[type="text"],
+    input[type="email"],
+    input[type="password"] {
+        width: 100%;
+        padding: 0.75rem 1rem;
+        background: rgba(15, 23, 42, 0.6);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        color: white;
+        font-family: inherit;
+        transition: all 0.2s;
+        margin-bottom: 0.5rem;
+    }
+
+    input:focus {
+        outline: none;
+        border-color: var(--primary);
+        box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2);
+    }
+
+    ul.errorlist {
+        color: var(--danger);
+        list-style-type: none;
+        font-size: 0.85rem;
+        padding-left: 0;
+    }
+</style>
+{% endblock %}

@@ -1,0 +1,182 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+<div class="glass-panel" style="margin-bottom: 2rem; user-select: none;" oncopy="return false;" oncut="return false;" onpaste="return false;" oncontextmenu="return false;">
+    <h2><span style="font-size: 1.5rem; margin-right: 0.5rem;">🎯</span> Available Challenges</h2>
+    <p style="color: var(--text-muted); margin-bottom: 2rem;">Select a question posted by an Admin to launch your coding
+        environment.</p>
+
+    {% if question_data %}
+    <div class="grid-2">
+        {% for item in question_data %}
+        <div class="card">
+            <div style="display: flex; justify-content: space-between; align-items:flex-start;">
+                <h3 style="margin-bottom: 0.5rem; font-size: 1.25rem;">{{ item.question.title }}</h3>
+            </div>
+
+            <p style="color: var(--text-muted); font-size: 0.9rem; line-height: 1.5; margin-bottom: 1rem;">
+                {{ item.question.description|truncatewords:20 }}
+            </p>
+
+            <div style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 1.5rem;">
+                <span
+                    style="background: rgba(255,255,255,0.05); padding: 0.25rem 0.6rem; border-radius: 4px; margin-right: 1rem;">
+                    👤 Admin: {{ item.question.created_by.name }}
+                </span>
+                📅 {{ item.question.created_at|date:"M d, Y" }}
+            </div>
+
+            {% if item.is_closed %}
+            <button class="btn btn-outline" disabled
+                style="width: 100%; border-color: rgba(255,255,255,0.1); color: var(--text-muted); cursor: not-allowed; opacity: 0.5;">Challenge Closed & Rewarded</button>
+            {% elif item.is_solved %}
+            <div style="display: flex; gap: 0.5rem;">
+                <button class="btn btn-outline" disabled
+                    style="flex: 2; border-color: var(--success); color: var(--success); cursor: not-allowed; opacity: 0.8;">✓ Solved</button>
+                <button 
+                    onclick="showLeaderboard({{ item.question.id }}, '{{ item.question.title|escapejs }}')" 
+                    class="btn btn-outline"
+                    style="flex: 1; border-color: #fbbf24; color: #fbbf24; font-size: 0.85rem;">🏆 Rank</button>
+            </div>
+            {% elif item.flag %}
+            <div style="display: flex; gap: 0.5rem;">
+                <a href="{% url 'coding_environment' item.question.id %}" class="btn btn-outline"
+                    style="flex: 2; border-color: var(--primary); color: var(--primary); font-size: 0.85rem;">Solve Challenge ➔</a>
+                <button 
+                    onclick="showLeaderboard({{ item.question.id }}, '{{ item.question.title|escapejs }}')" 
+                    class="btn btn-outline"
+                    style="flex: 1; border-color: #fbbf24; color: #fbbf24; font-size: 0.85rem;">🏆 Rank</button>
+            </div>
+            {% else %}
+            <button class="btn btn-outline" disabled
+                style="width: 100%; border-color: var(--danger); color: var(--danger); cursor: not-allowed; opacity: 0.5;">0 Points: Locked Out</button>
+            {% endif %}
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="flex-center" style="height: 100%; min-height: 200px; flex-direction: column; opacity: 0.5;">
+        <div style="font-size: 3rem; margin-bottom: 1rem;">📭</div>
+        <p>No challenges posted yet. Check back later!</p>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Leaderboard Modal -->
+<div id="leaderboard-modal" class="flex-center" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(15, 23, 42, 0.9); z-index: 100; backdrop-filter: blur(8px);">
+    <div class="glass-panel" style="width: 90%; max-width: 500px; padding: 2rem; border: 1px solid rgba(251, 191, 36, 0.3);">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
+            <h2 id="modal-title" style="margin: 0; font-size: 1.5rem; color: #fbbf24;">🏆 Leaderboard</h2>
+            <button onclick="hideLeaderboard()" style="background: none; border: none; color: white; cursor: pointer; font-size: 1.5rem;">&times;</button>
+        </div>
+        
+        <div id="leaderboard-content">
+            <div class="flex-center" style="padding: 2rem;">
+                <div class="loader"></div>
+            </div>
+        </div>
+
+        <div id="user-rank-box" style="margin-top: 2rem; padding-top: 1.5rem; border-top: 1px solid var(--border);">
+            <!-- User Rank details will be injected here -->
+        </div>
+    </div>
+</div>
+
+<style>
+    .rank-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 0.75rem 1rem;
+        background: rgba(255,255,255,0.03);
+        border-radius: 8px;
+        margin-bottom: 0.5rem;
+        transition: transform 0.2s;
+    }
+    .rank-item:hover {
+        transform: scale(1.02);
+        background: rgba(255,255,255,0.05);
+    }
+    .top-1 { border-left: 4px solid #fbbf24; background: rgba(251, 191, 36, 0.05); }
+    .top-2 { border-left: 4px solid #94a3b8; }
+    .top-3 { border-left: 4px solid #b45309; }
+</style>
+
+<script>
+    function showLeaderboard(questionId, title) {
+        document.getElementById('modal-title').innerText = `🏆 Leaderboard: ${title}`;
+        document.getElementById('leaderboard-modal').style.display = 'flex';
+        document.getElementById('leaderboard-content').innerHTML = '<div class="flex-center" style="padding: 2rem;"><div class="loader"></div></div>';
+        document.getElementById('user-rank-box').innerHTML = '';
+
+        fetch(`/core/leaderboard/${questionId}/`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    renderLeaderboard(data);
+                } else {
+                    document.getElementById('leaderboard-content').innerHTML = '<p style="color: var(--danger); text-align: center;">Error loading leaderboard.</p>';
+                }
+            })
+            .catch(err => {
+                console.error(err);
+                document.getElementById('leaderboard-content').innerHTML = '<p style="color: var(--danger); text-align: center;">Network error.</p>';
+            });
+    }
+
+    function renderLeaderboard(data) {
+        let html = '';
+        if (data.leaderboard.length === 0) {
+            html = '<p style="text-align: center; opacity: 0.5; padding: 1rem;">No submissions yet. Be the first!</p>';
+        } else {
+            data.leaderboard.forEach(sol => {
+                const rankClass = sol.rank <= 3 ? `top-${sol.rank}` : '';
+                html += `
+                    <div class="rank-item ${rankClass}">
+                        <div style="display: flex; align-items: center; gap: 1rem;">
+                            <span style="font-weight: bold; width: 20px;">${sol.rank}</span>
+                            <span>${sol.name}</span>
+                        </div>
+                        <div style="text-align: right;">
+                            <div style="font-size: 0.9rem; color: #fbbf24;">${sol.evaluation}</div>
+                            <div style="font-size: 0.7rem; color: var(--text-muted);">${sol.points} pts</div>
+                        </div>
+                    </div>
+                `;
+            });
+        }
+        document.getElementById('leaderboard-content').innerHTML = html;
+
+        if (data.user_rank) {
+            document.getElementById('user-rank-box').innerHTML = `
+                <div style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.5rem;">Your Position</div>
+                <div class="rank-item" style="background: rgba(59, 130, 246, 0.1); border-left: 4px solid var(--primary);">
+                    <div style="display: flex; align-items: center; gap: 1rem;">
+                        <span style="font-weight: bold; width: 20px;">${data.user_rank.rank}</span>
+                        <span>${data.user_rank.name} (You)</span>
+                    </div>
+                    <div style="text-align: right;">
+                        <div style="font-size: 0.9rem; color: #fbbf24;">${data.user_rank.evaluation}</div>
+                        <div style="font-size: 0.7rem; color: var(--text-muted);">${data.user_rank.points} pts</div>
+                    </div>
+                </div>
+            `;
+        } else {
+            document.getElementById('user-rank-box').innerHTML = '<p style="font-size: 0.85rem; opacity: 0.5; text-align: center;">You haven\'t submitted a solution yet.</p>';
+        }
+    }
+
+    function hideLeaderboard() {
+        document.getElementById('leaderboard-modal').style.display = 'none';
+    }
+    
+    // Close on click outside
+    window.onclick = function(event) {
+        const modal = document.getElementById('leaderboard-modal');
+        if (event.target == modal) {
+            hideLeaderboard();
+        }
+    }
+</script>
+{% endblock %}

@@ -1,0 +1,429 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<style>
+    /* Ensure the editor container takes full height in fullscreen mode */
+    :fullscreen .editor-container,
+    :-webkit-full-screen .editor-container,
+    :-ms-fullscreen .editor-container {
+        height: 100vh !important;
+        max-height: 100vh !important;
+        padding: 0 !important;
+        gap: 0 !important;
+    }
+    :fullscreen .editor-pane,
+    :-webkit-full-screen .editor-pane,
+    :-ms-fullscreen .editor-pane {
+        border-radius: 0 !important;
+        border: none !important;
+    }
+</style>
+<div class="editor-container" style="user-select: none;" oncopy="return false;" oncut="return false;"
+    oncontextmenu="return false;">
+    <!-- Left Pane: Problem Description -->
+    <div class="editor-pane glass-panel" style="padding: 1.5rem; background: var(--bg-panel); display: block;">
+        <div
+            style="display: flex; justify-content: space-between; align-items:flex-start; margin-bottom: 1.5rem; padding-bottom: 1rem; border-bottom: 1px solid var(--border);">
+            <h2 style="margin: 0; font-size: 1.75rem;">{{ question.title }}</h2>
+            <div style="display: flex; gap: 1rem; align-items: center;">
+                <span id="points-display"
+                    style="background: rgba(239, 68, 68, 0.15); padding: 0.35rem 0.75rem; border-radius: 4px; font-size: 0.85rem; color: #fca5a5; border: 1px solid #ef4444;"
+                    title="Minimum count points for the coder is 3. If you exit full screen mode and copy-paste the code from the internet, the minimum number of points will be decreased by one. If points count is zero, you will be unable to answer because you crossed the minimum limit.">
+                    ⚠️ Min Points: <span id="points-count">{{ previous_solution.points_left|default:3 }}</span> <span
+                        style="cursor: pointer;">ℹ️</span>
+                </span>
+                <span
+                    style="background: rgba(255,255,255,0.05); padding: 0.35rem 0.75rem; border-radius: 4px; font-size: 0.85rem; color: var(--text-muted);">
+                    👤 Posted by {{ question.created_by.name }}
+                </span>
+            </div>
+        </div>
+
+        <div
+            style="color: #e2e8f0; line-height: 1.6; font-size: 1rem; overflow-y: auto; height: calc(100% - 100px); padding-right: 0.5rem; white-space: pre-wrap; font-family: 'Inter', sans-serif;">
+            {{ question.description }}</div>
+    </div>
+
+    <!-- Right Pane: Code Editor Form -->
+    <form id="solution-form" method="POST" class="editor-pane"
+        style="background: #1e1e1e; display: flex; flex-direction: column; margin: 0; min-height: 0; position: relative;">
+
+        <!-- Full Screen Block Overlay -->
+        <div id="fullscreen-overlay"
+            style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: rgba(15, 23, 42, 0.95); z-index: 50; display: flex; flex-direction: column; align-items: center; justify-content: center; backdrop-filter: blur(8px);">
+            <div style="font-size: 4rem; margin-bottom: 1rem;">🔒</div>
+            <h3 style="color: white; font-size: 1.5rem; margin-bottom: 1rem; text-align: center;">Full Screen Required
+            </h3>
+            <p
+                style="color: var(--text-muted); margin-bottom: 2rem; max-width: 400px; text-align: center; line-height: 1.6;">
+                You must enter Full Screen mode to write and submit your solution. Exiting during the session will cost
+                you 1 point.</p>
+            <button type="button" id="btn-enable-fullscreen" class="btn btn-primary"
+                style="font-size: 1.1rem; padding: 0.75rem 2rem;">Enable Full Screen Mode</button>
+        </div>
+
+        {% csrf_token %}
+        <div class="editor-header">
+            <span>💻 index.py</span>
+            <div style="display: flex; gap: 0.5rem;">
+                <select name="language" required
+                    style="background: #3c3c3c; color: white; border: none; padding: 0.25rem; border-radius: 4px; font-size: 0.75rem; outline: none;">
+                    <option value="Python" {% if previous_solution and previous_solution.language == 'Python' %}selected{% endif %}>Python</option>
+                    <option value="Java" {% if previous_solution and previous_solution.language == 'Java' %}selected{% endif %}>Java</option>
+                    <option value="C++" {% if previous_solution and previous_solution.language == 'C++' %}selected{% endif %}>C++</option>
+                    <option value="JavaScript" {% if previous_solution and previous_solution.language == 'JavaScript' %}selected{% endif %}>JavaScript</option>
+                </select>
+            </div>
+        </div>
+        
+
+        <div id="editor" style="flex: 1; min-height: 200px; border-top: 1px solid #333; overflow: hidden;"></div>
+        <input type="hidden" name="code" id="hidden_code">
+
+        <div
+            style="background: #2d2d2d; padding: 1rem; border-top: 1px solid #1e1e1e; display: flex; justify-content: flex-end; gap: 1rem; flex-shrink: 0; z-index: 10; align-items: center;">
+            <div id="ai-evaluation-display" style="margin-right: auto; padding: 0.5rem 1rem; border-radius: 6px; font-size: 0.85rem; display: none; background: rgba(255,255,255,0.05);">
+                AI Evaluation: <span id="ai-result-text" style="font-weight: bold; color: #fbbf24;"></span>
+            </div>
+            <button type="button" id="execute-btn" class="btn btn-outline"
+                style="padding: 0.5rem 1rem; border-color: var(--primary); color: var(--primary); font-size: 0.9rem;">▶ Execute AI Evaluation</button>
+            <button type="submit" id="submit-btn" class="btn btn-primary"
+                style="padding: 0.5rem 1.5rem; background: var(--success); font-size: 0.9rem;">Submit
+                Solution</button>
+        </div>
+    </form>
+</div>
+
+<!-- Submit Confirmation Modal -->
+<div id="submit-modal" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 9999; align-items: center; justify-content: center; backdrop-filter: blur(4px);">
+    <div style="background: var(--bg-panel); border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; padding: 2rem; max-width: 420px; width: 90%; text-align: center;">
+        <div style="font-size: 2.5rem; margin-bottom: 0.75rem;">⚠️</div>
+        <h3 style="color: white; margin: 0 0 0.75rem;">Final Submission</h3>
+        <p style="color: var(--text-muted); font-size: 0.9rem; line-height: 1.6; margin-bottom: 1.75rem;">
+            Once you submit, you <strong style="color: #fbbf24;">won't be able to return and solve this challenge again</strong>. Your current code will be saved as your final answer. Do you want to continue?
+        </p>
+        <div style="display: flex; gap: 1rem; justify-content: center;">
+            <button id="modal-cancel" style="padding: 0.6rem 1.5rem; border: 1px solid rgba(255,255,255,0.2); background: transparent; color: white; border-radius: 6px; cursor: pointer; font-size: 0.9rem;">Cancel</button>
+            <button id="modal-confirm" style="padding: 0.6rem 1.5rem; background: var(--success); color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 0.9rem; font-weight: 600;">Yes, Submit</button>
+        </div>
+    </div>
+</div>
+
+<!-- In-page Toast Notification (replaces alert() to preserve fullscreen) -->
+<div id="in-page-toast" style="display:none; position:fixed; bottom:2rem; right:2rem; z-index:99999; background:#1e293b; border:1px solid rgba(255,255,255,0.15); border-radius:8px; padding:0.75rem 1.25rem; font-size:0.85rem; color:white; max-width:360px; box-shadow:0 4px 20px rgba(0,0,0,0.4); pointer-events:none;"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.53.0/min/vs/loader.min.js"></script>
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        const languageSelect = document.querySelector('select[name="language"]');
+        const hiddenCode = document.getElementById('hidden_code');
+        const form = document.getElementById('solution-form');
+        const pointsCountSpan = document.getElementById('points-count');
+        const overlay = document.getElementById('fullscreen-overlay');
+        const btnFullscreen = document.getElementById('btn-enable-fullscreen');
+        const executeBtn = document.getElementById('execute-btn');
+        const aiDisplay = document.getElementById('ai-evaluation-display');
+        const aiResultText = document.getElementById('ai-result-text');
+        const submitBtn = document.getElementById('submit-btn');
+        const submitModal = document.getElementById('submit-modal');
+        const modalCancel = document.getElementById('modal-cancel');
+        const modalConfirm = document.getElementById('modal-confirm');
+        const container = document.documentElement;
+        let pendingSubmit = false;
+        let isSubmitting = false;
+
+
+        // Modal handlers
+        submitModal.addEventListener('click', function(e) { if(e.target === submitModal) submitModal.style.display = 'none'; });
+        modalCancel.addEventListener('click', () => submitModal.style.display = 'none');
+        modalConfirm.addEventListener('click', function() {
+            submitModal.style.display = 'none';
+            isSubmitting = true;
+            pendingSubmit = true;
+            submitBtn.click();
+        });
+
+        // State variables
+        let pointsLeft = parseInt("{{ previous_solution.points_left|default:3 }}");
+        let isFullScreen = false;
+        let isFirstLoad = true;
+
+        if (pointsLeft <= 0) {
+            btnFullscreen.style.opacity = '0.5';
+            btnFullscreen.style.cursor = 'not-allowed';
+            btnFullscreen.innerText = "Challenge Locked";
+        }
+
+        // Fullscreen API Logic
+        btnFullscreen.addEventListener('click', function () {
+            if (pointsLeft <= 0) {
+                alert("Unable to answer because you crossed the minimum limit points.");
+                return;
+            }
+            if (container.requestFullscreen) {
+                container.requestFullscreen();
+            } else if (container.webkitRequestFullscreen) { /* Safari */
+                container.webkitRequestFullscreen();
+            } else if (container.msRequestFullscreen) { /* IE11 */
+                container.msRequestFullscreen();
+            }
+        });
+
+        document.addEventListener('fullscreenchange', (event) => {
+            if (document.fullscreenElement) {
+                // Entered Fullscreen
+                isFullScreen = true;
+                overlay.style.display = 'none';
+                if (isFirstLoad) {
+                    isFirstLoad = false; // Do not penalize on the very first entry
+                }
+                // Trigger Monaco layout update
+                if (window.editor) {
+                    setTimeout(() => window.editor.layout(), 100);
+                }
+            } else {
+                // Exited Fullscreen
+                isFullScreen = false;
+                overlay.style.display = 'flex';
+
+                if (!isFirstLoad && pointsLeft > 0 && !isSubmitting) {
+                    fetch("{% url 'decrement_points' question.id %}", {
+                        method: 'POST',
+                        headers: {
+                            'X-CSRFToken': '{{ csrf_token }}',
+                            'Content-Type': 'application/json'
+                        }
+                    })
+                        .then(response => response.json())
+                        .then(data => {
+                            if (data.status === 'success') {
+                                pointsLeft = data.points_left;
+                                pointsCountSpan.innerText = pointsLeft;
+
+                                if (pointsLeft <= 0) {
+                                    alert("You have exhausted your minimum points limit. You can no longer submit answers for this challenge.");
+                                    btnFullscreen.style.opacity = '0.5';
+                                    btnFullscreen.style.cursor = 'not-allowed';
+                                    window.location.href = "{% url 'coder_dashboard' %}";
+                                } else {
+                                    alert(`Warning: You exited full screen! You lost 1 point. Points remaining: ${pointsLeft}`);
+                                }
+                            } else {
+                                alert("Error updating points on server.");
+                            }
+                        })
+                        .catch(err => console.error("Error decrementing points:", err));
+                }
+            }
+        });
+
+        const langMap = {
+            'Python': 'python',
+            'Java': 'java',
+            'C++': 'cpp',
+            'JavaScript': 'javascript'
+        };
+
+        const boilerplates = {
+            'Python': '# Write your Python solution here...\ndef solve():\n    pass\n',
+            'Java': '// Write your Java solution here...\nclass Solution {\n    public void solve() {\n        \n    }\n}\n',
+            'C++': '// Write your C++ solution here...\nclass Solution {\npublic:\n    void solve() {\n        \n    }\n};\n',
+            'JavaScript': '// Write your JavaScript solution here...\nfunction solve() {\n    \n}\n'
+        };
+
+        // Use a safer method to inject the code from the server side
+        let initialCode = `{{ previous_solution.code|escapejs }}`;
+        let currentLang = languageSelect.value;
+
+        if (!initialCode || initialCode.trim() === '') {
+            initialCode = boilerplates[currentLang] || '';
+        }
+
+        require.config({ paths: { 'vs': 'https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.53.0/min/vs' } });
+        require(['vs/editor/editor.main'], function () {
+            window.editor = monaco.editor.create(document.getElementById('editor'), {
+                value: initialCode,
+                language: langMap[currentLang],
+                theme: 'vs-dark',
+                automaticLayout: true,
+                minimap: { enabled: false },
+                fontSize: 14,
+                fontFamily: "'Courier New', Consolas, monospace",
+                scrollBeyondLastLine: false,
+                padding: { top: 16 }
+            });
+
+            // Initial sync
+            hiddenCode.value = window.editor.getValue();
+
+            // Sync on every keystroke
+            window.editor.onDidChangeModelContent(function () {
+                hiddenCode.value = window.editor.getValue();
+            });
+
+            form.addEventListener('submit', function (e) {
+                e.preventDefault();
+
+                if (!isFullScreen) {
+                    alert("You must be in Full Screen mode to submit your solution.");
+                    return;
+                }
+                if (pointsLeft <= 0) {
+                    alert("Unable to answer because you crossed the minimum limit points.");
+                    return;
+                }
+
+                // Show confirmation modal unless user already confirmed
+                if (!pendingSubmit) {
+                    submitModal.style.display = 'flex';
+                    return;
+                }
+                pendingSubmit = false;
+
+                submitBtn.innerText = 'Submitting...';
+                submitBtn.disabled = true;
+
+                const formData = new FormData(form);
+
+                fetch(window.location.href, {
+                    method: 'POST',
+                    body: formData,
+                    headers: { 'X-CSRFToken': '{{ csrf_token }}' }
+                })
+                .then(response => response.json())
+                .then(data => {
+                    submitBtn.disabled = false;
+                    submitBtn.innerText = 'Submit Solution';
+
+                    if (data.status === 'success') {
+                        // Intentional exit - redirect to dashboard
+                        if (document.fullscreenElement) {
+                            if (document.exitFullscreen) document.exitFullscreen();
+                            else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
+                        }
+                        window.location.href = "{% url 'coder_dashboard' %}";
+                    } else {
+                        isSubmitting = false; // Reset if error
+                        alert("Submission Error: " + data.message);
+                    }
+                })
+                .catch(err => {
+                    console.error("Submission failed:", err);
+                    submitBtn.disabled = false;
+                    submitBtn.innerText = 'Submit Solution';
+                    alert("Submission failed. Please check your connection.");
+                });
+            });
+
+            executeBtn.addEventListener('click', function() {
+                if (!isFullScreen) {
+                    alert("You must be in Full Screen mode to execute AI evaluation.");
+                    return;
+                }
+                
+                executeBtn.disabled = true;
+                executeBtn.innerText = 'Evaluating...';
+                aiDisplay.style.display = 'none';
+
+                const formData = new FormData();
+                formData.append('question_id', '{{ question.id }}');
+                formData.append('code', window.editor.getValue());
+
+                fetch("{% url 'execute_code' %}", {
+                    method: 'POST',
+                    body: formData,
+                    headers: { 'X-CSRFToken': '{{ csrf_token }}' }
+                })
+                .then(response => response.json())
+                .then(data => {
+                    executeBtn.disabled = false;
+                    executeBtn.innerText = '▶ Execute AI Evaluation';
+                    
+                    if (data.status === 'success') {
+                        aiResultText.innerText = data.evaluation;
+                        aiDisplay.style.display = 'block';
+                    } else {
+                        alert("Evaluation Error: " + data.message);
+                    }
+                })
+                .catch(err => {
+                    console.error("Evaluation failed:", err);
+                    executeBtn.disabled = false;
+                    executeBtn.innerText = '▶ Execute AI Evaluation';
+                    alert("AI Evaluation failed. Please check your connection.");
+                });
+            });
+
+
+            // In-page toast: shows message without breaking fullscreen
+            let toastTimer = null;
+            function showToast(msg, duration) {
+                const toast = document.getElementById('in-page-toast');
+                toast.innerText = msg;
+                toast.style.display = 'block';
+                toast.style.opacity = '1';
+                if (toastTimer) clearTimeout(toastTimer);
+                toastTimer = setTimeout(() => {
+                    toast.style.transition = 'opacity 0.4s';
+                    toast.style.opacity = '0';
+                    setTimeout(() => { toast.style.display = 'none'; toast.style.transition = ''; }, 400);
+                }, duration || 3500);
+            }
+
+            languageSelect.addEventListener('change', function (e) {
+                const newLang = e.target.value;
+                const newMonacoLang = langMap[newLang];
+
+                // Update syntax highlighting
+                monaco.editor.setModelLanguage(window.editor.getModel(), newMonacoLang);
+
+                // If the current code is empty or matches another boilerplate, switch it
+                const currentVal = window.editor.getValue().trim();
+                const isBoilerplate = Object.values(boilerplates).some(b => b.trim() === currentVal);
+
+                if (currentVal === '' || isBoilerplate) {
+                    window.editor.setValue(boilerplates[newLang] || '');
+                }
+            });
+
+            // Prevent paste inside Monaco editor & Trigger Fullscreen Exit
+            window.editor.onKeyDown(function (e) {
+                // Check if Ctrl+V or Cmd+V is pressed
+                if (e.keyCode === monaco.KeyCode.KeyV && (e.ctrlKey || e.metaKey)) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    
+                    // Force Exit Fullscreen
+                    if (document.exitFullscreen) {
+                        document.exitFullscreen();
+                    } else if (document.webkitExitFullscreen) {
+                        document.webkitExitFullscreen();
+                    }
+                    
+                    alert("Pasting code is strictly prohibited! You have been forced out of full screen and will lose 1 point.");
+                }
+            });
+        });
+
+        // Global paste prevention fallback & Trigger Fullscreen Exit
+        document.addEventListener('paste', function (e) {
+            e.preventDefault();
+            
+            if (document.fullscreenElement) {
+                if (document.exitFullscreen) document.exitFullscreen();
+                else if (document.webkitExitFullscreen) document.webkitExitFullscreen();
+            }
+            
+            alert("Pasting is strictly prohibited! You have been forced out of full screen.");
+            return false;
+        });
+
+        // Handle window resize for Monaco
+        window.addEventListener('resize', function() {
+            if (window.editor) {
+                window.editor.layout();
+            }
+        });
+    });
+</script>
+{% endblock %}
