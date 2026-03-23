@@ -7,6 +7,11 @@ def home(request):
     return render(request, 'home.html')
 
 def admin_login(request):
+    if request.session.get('role') == 'admin':
+        if request.session.get('is_superadmin'):
+            return redirect('superadmin_dashboard')
+        return redirect('admin_dashboard')
+        
     if request.method == 'POST':
         form = AdminLoginForm(request.POST)
         if form.is_valid():
@@ -48,6 +53,9 @@ def admin_register(request):
     return render(request, 'accounts/admin_register.html', {'form': form})
 
 def coder_login(request):
+    if request.session.get('role') == 'coder':
+        return redirect('coder_dashboard')
+        
     if request.method == 'POST':
         form = CoderLoginForm(request.POST)
         if form.is_valid():
